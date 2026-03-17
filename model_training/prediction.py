@@ -76,7 +76,11 @@ def run_manual_prediction(feature_map: Dict[str, float], model_bundle: dict) -> 
     return row, float(prob), depth, flood
 
 
-def predict_with_weather(barangay: str, registry: Optional[dict[str, dict]] = None) -> dict:
+def predict_with_weather(
+    barangay: str,
+    registry: Optional[dict[str, dict]] = None,
+    weather: Optional[pd.DataFrame] = None,
+) -> dict:
     """Generate short-term forecasts for a barangay using freshly pulled weather data."""
 
     model_bundle = get_model_for_barangay(barangay, registry)
@@ -86,10 +90,10 @@ def predict_with_weather(barangay: str, registry: Optional[dict[str, dict]] = No
     reg_model = model_bundle.get("reg")
     barangay_metrics = model_bundle["metrics"]
 
-    weather = get_weather()
+    weather_df = weather if weather is not None else get_weather()
     results = []
 
-    for i, row in weather.iterrows():
+    for i, row in weather_df.iterrows():
         valid_features = [f for f in features if f in row.index]
         X = row[valid_features].to_frame().T
 

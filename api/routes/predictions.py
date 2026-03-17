@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from model_training import (
     ModelNotFoundError,
     get_available_barangays,
+    get_weather,
     manual_prediction_response,
     predict_with_weather,
 )
@@ -46,10 +47,11 @@ def predict_all_barangays():
 
     predictions = []
     failed = []
+    weather = get_weather()
 
     for barangay in barangays:
         try:
-            predictions.append(predict_with_weather(barangay))
+            predictions.append(predict_with_weather(barangay, weather=weather))
         except Exception as exc:
             failed.append({"barangay": barangay, "error": str(exc)})
 
