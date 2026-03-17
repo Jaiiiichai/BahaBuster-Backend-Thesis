@@ -11,3 +11,43 @@ class ManualPredictionRequest(BaseModel):
     features: Dict[str, float]
     actual_flood: Optional[bool] = None
     actual_depth_cm: Optional[float] = None
+
+
+class UserResponse(BaseModel):
+    """Serialized user row returned by the users endpoint."""
+
+    user_id: int
+    email: str
+    name: str
+    barangay: str
+    password_hash: str
+    role: str
+    created_at: str
+
+
+class UserCreateRequest(BaseModel):
+    """Payload contract for creating a user in Supabase."""
+
+    email: str
+    name: str
+    barangay: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    """Credentials for user login."""
+
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """JWT token returned on successful login."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    name: str
+    email: str
+    barangay: str
+    role: str

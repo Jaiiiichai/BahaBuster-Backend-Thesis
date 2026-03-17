@@ -7,3 +7,6 @@ xgboost
 imbalanced-learn
 requests
 joblib
+python-dotenv
+bcrypt
+PyJWT

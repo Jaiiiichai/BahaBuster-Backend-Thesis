@@ -1,0 +1,27 @@
+# Git and editor artifacts
+.git
+.gitignore
+.vscode
+.idea
+
+# Python cache and virtual environments
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Environment/secrets
+.env
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Build/test artifacts
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/

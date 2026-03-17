@@ -1,7 +1,12 @@
 """Prediction endpoints that expose the model-training package over HTTP."""
 from fastapi import APIRouter, HTTPException, Query
 
-from model_training import ModelNotFoundError, manual_prediction_response, predict_with_weather
+from model_training import (
+    ModelNotFoundError,
+    get_available_barangays,
+    manual_prediction_response,
+    predict_with_weather,
+)
 
 from ..schemas import ManualPredictionRequest
 
@@ -29,6 +34,30 @@ def predict_flood(barangay: str = Query(..., description="Barangay name")):
     """Convenience endpoint that mirrors predict() but uses a query string parameter."""
 
     return predict(barangay)
+
+
+@router.get("/predict_all")
+def predict_all_barangays():
+    """Return weather-driven predictions for every barangay with a trained model."""
+
+    barangays = get_available_barangays()
+    if not barangays:
+        raise HTTPException(status_code=404, detail="No available barangay models found.")
+
+    predictions = []
+    failed = []
+
+    for barangay in barangays:
+        try:
+            predictions.append(predict_with_weather(barangay))
+        except Exception as exc:
+            failed.append({"barangay": barangay, "error": str(exc)})
+
+    return {
+        "count": len(predictions),
+        "barangays": predictions,
+        "failed": failed,
+    }
 
 
 @router.post("/predict_manual")

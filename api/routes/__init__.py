@@ -1,4 +1,4 @@
 """Route modules grouped under the api.routes package."""
-from . import health, predictions
+from . import auth, health, predictions, users
 
-__all__ = ["health", "predictions"]
+__all__ = ["auth", "health", "predictions", "users"]
