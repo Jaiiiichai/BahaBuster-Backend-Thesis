@@ -14,11 +14,11 @@ from .registry import get_model_for_barangay
 def risk_level(probability: float) -> str:
     """Convert a flood probability into the categorical risk buckets used downstream."""
 
-    if probability < 0.1:
+    if probability < 0.2:
         return "LOW"
-    if probability < 0.3:
+    if probability < 0.5:
         return "MODERATE"
-    if probability < 0.6:
+    if probability > 0.5:
         return "HIGH"
     return "SEVERE"
 

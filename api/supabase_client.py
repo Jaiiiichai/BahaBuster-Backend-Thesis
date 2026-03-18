@@ -230,3 +230,55 @@ def fetch_flood_reports_by_barangay(
         raise RuntimeError("Unexpected Supabase response format for flood reports.")
 
     return payload
+
+
+def insert_alert(client: SupabaseClient, alert: dict, timeout: int = 10) -> dict:
+    """Insert one alert row and return the created record."""
+
+    endpoint = f"{client.url}/rest/v1/alerts"
+    headers = {
+        "Prefer": "return=representation",
+    }
+
+    try:
+        response = client.session.post(endpoint, json=alert, headers=headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase alert insert failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase alert insert failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError("Supabase alert insert did not return the created alert.")
+
+    return payload[0]
+
+
+def fetch_alerts_by_barangay(
+    client: SupabaseClient,
+    barangay: str,
+    timeout: int = 10,
+) -> list[dict]:
+    """Fetch alerts filtered by barangay/location using case-insensitive matching."""
+
+    endpoint = f"{client.url}/rest/v1/alerts"
+    params = {
+        "select": "id,title,location,description,severity,status,acknowledged,created_at",
+        "location": f"ilike.{barangay.strip()}",
+        "order": "created_at.desc",
+    }
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase alerts query failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase alerts query failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise RuntimeError("Unexpected Supabase response format for alerts.")
+
+    return payload

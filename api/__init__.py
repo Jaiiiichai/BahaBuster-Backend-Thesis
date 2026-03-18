@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes import auth, health, predictions, reports, users
+from .routes import alerts, auth, health, predictions, reports, users
 from .supabase_client import SupabaseConfigError, create_supabase_client, verify_supabase_connection
 
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(predictions.router)
     app.include_router(users.router)
     app.include_router(auth.router)
+    app.include_router(alerts.router)
     app.include_router(reports.router)
     app.include_router(health.router)
 
