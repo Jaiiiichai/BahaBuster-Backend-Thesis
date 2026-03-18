@@ -1,4 +1,5 @@
 """Pydantic schemas shared across API routes."""
+from datetime import datetime
 from typing import Dict, Optional
 
 from pydantic import BaseModel
@@ -51,3 +52,27 @@ class LoginResponse(BaseModel):
     email: str
     barangay: str
     role: str
+
+
+class FloodReportCreateRequest(BaseModel):
+    """Payload contract for creating a flood report."""
+
+    severity: str
+    description: Optional[str] = None
+    photos: list[str] = []
+    user_barangay: str
+    user_email: str
+    timestamp: datetime
+
+
+class FloodReportResponse(BaseModel):
+    """Serialized flood report row returned by the reports endpoints."""
+
+    report_id: int
+    severity: str
+    description: Optional[str] = None
+    photos: list[str]
+    user_barangay: str
+    user_email: str
+    timestamp: datetime
+    created_at: datetime

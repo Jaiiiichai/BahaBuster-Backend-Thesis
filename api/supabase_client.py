@@ -178,3 +178,55 @@ def update_user_password_hash(
         raise RuntimeError("Supabase password update did not return the updated user.")
 
     return payload[0]
+
+
+def insert_flood_report(client: SupabaseClient, report: dict, timeout: int = 10) -> dict:
+    """Insert one flood report row and return the created record."""
+
+    endpoint = f"{client.url}/rest/v1/flood_reports"
+    headers = {
+        "Prefer": "return=representation",
+    }
+
+    try:
+        response = client.session.post(endpoint, json=report, headers=headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase flood report insert failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase flood report insert failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError("Supabase flood report insert did not return the created report.")
+
+    return payload[0]
+
+
+def fetch_flood_reports_by_barangay(
+    client: SupabaseClient,
+    barangay: str,
+    timeout: int = 10,
+) -> list[dict]:
+    """Fetch flood reports filtered by barangay name using case-insensitive matching."""
+
+    endpoint = f"{client.url}/rest/v1/flood_reports"
+    params = {
+        "select": "report_id,severity,description,photos,user_barangay,user_email,timestamp,created_at",
+        "user_barangay": f"ilike.{barangay.strip()}",
+        "order": "timestamp.desc",
+    }
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase flood report query failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase flood report query failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise RuntimeError("Unexpected Supabase response format for flood reports.")
+
+    return payload
