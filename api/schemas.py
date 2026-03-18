@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ManualPredictionRequest(BaseModel):
@@ -59,10 +59,9 @@ class FloodReportCreateRequest(BaseModel):
 
     severity: str
     description: Optional[str] = None
-    photos: list[str] = []
+    photos: list[str] = Field(default_factory=list)
     user_barangay: str
     user_email: str
-    timestamp: datetime
 
 
 class FloodReportResponse(BaseModel):

@@ -1,4 +1,6 @@
 """Flood report endpoints backed by Supabase."""
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..schemas import FloodReportCreateRequest, FloodReportResponse
@@ -16,7 +18,9 @@ def create_report(payload: FloodReportCreateRequest, request: Request):
         raise HTTPException(status_code=503, detail="Supabase is not configured.")
 
     try:
-        report = insert_flood_report(supabase_client, payload.model_dump(mode="json"))
+        report_payload = payload.model_dump(mode="json")
+        report_payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+        report = insert_flood_report(supabase_client, report_payload)
         return report
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
