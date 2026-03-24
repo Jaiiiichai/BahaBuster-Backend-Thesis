@@ -282,3 +282,58 @@ def fetch_alerts_by_barangay(
         raise RuntimeError("Unexpected Supabase response format for alerts.")
 
     return payload
+
+
+def upload_image_to_bucket(
+    client: SupabaseClient,
+    bucket_name: str,
+    file_path: str,
+    image_bytes: bytes,
+    content_type: str = "image/jpeg",
+    timeout: int = 30,
+) -> dict:
+    """
+    Upload an image to a Supabase storage bucket.
+    
+    Args:
+        client: SupabaseClient instance
+        bucket_name: Name of the storage bucket (e.g., 'flood-images')
+        file_path: Path where the file will be stored in the bucket (e.g., 'banilad/2024-03-24-123456.jpg')
+        image_bytes: Raw image bytes to upload
+        content_type: MIME type of the image
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Dictionary with upload details including the public URL
+        
+    Raises:
+        RuntimeError: If upload fails
+    """
+    endpoint = f"{client.url}/storage/v1/object/{bucket_name}/{file_path}"
+    headers = client.session.headers.copy()
+    headers["Content-Type"] = content_type
+    
+    try:
+        response = requests.post(
+            endpoint,
+            headers=headers,
+            data=image_bytes,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase image upload failed: {exc}") from exc
+    
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase image upload failed with HTTP {response.status_code}: {response.text}"
+        )
+    
+    # Construct the public URL
+    public_url = f"{client.url}/storage/v1/object/public/{bucket_name}/{file_path}"
+    
+    return {
+        "file_path": file_path,
+        "bucket_name": bucket_name,
+        "public_url": public_url,
+        "size_bytes": len(image_bytes),
+    }
