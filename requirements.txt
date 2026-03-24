@@ -10,3 +10,6 @@ joblib
 python-dotenv
 bcrypt
 PyJWT
+Pillow
+python-multipart
+openai

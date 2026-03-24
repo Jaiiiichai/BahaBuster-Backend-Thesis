@@ -99,3 +99,21 @@ class AlertResponse(BaseModel):
     status: Literal["active", "resolved"]
     acknowledged: bool
     created_at: datetime
+
+
+class ImageAnalysisResponse(BaseModel):
+    """Response from image flood analysis."""
+
+    is_flood: bool
+    flood_classification: Literal["FLOOD", "NO FLOOD"]
+    water_percentage: float
+    description: str
+    short_summary: str
+    severity: Literal["mild", "moderate", "severe", "none"]
+    confidence: float
+    has_people: bool
+    has_structures: bool
+    water_type: str
+    recommendations: list[str]
+    image_info: Dict
+    barangay: Optional[str] = None
