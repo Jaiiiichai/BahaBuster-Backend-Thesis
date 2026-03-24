@@ -71,8 +71,6 @@ def analyze_flood_image(
             - short_summary: Brief summary
             - severity: Flood severity (mild/moderate/severe/none)
             - confidence: Confidence level (0-100)
-            - has_people: Whether people are at risk
-            - has_structures: Whether structures are affected
             - recommendations: List of recommended actions
             
     Raises:
