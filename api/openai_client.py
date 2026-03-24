@@ -115,9 +115,6 @@ def analyze_flood_image(
     "short_summary": "1 sentence summary (max 80 characters)",
     "severity": "mild", "moderate", or "severe" (only if is_flood is true, else "none"),
     "confidence": number 0-100 indicating how confident you are,
-    "has_people": boolean - are people visible and potentially at risk,
-    "has_structures": boolean - are buildings or infrastructure affected,
-    "water_type": "description of water type: clear, murky, turbulent, stagnant, brown/muddy, or if no flood: 'none'",
     "recommendations": ["action 1", "action 2", "action 3"] - practical actions for local authorities if flood, else empty array
 }}"""
                         }
@@ -144,9 +141,6 @@ def analyze_flood_image(
                 "short_summary": "Analysis unavailable",
                 "severity": "none",
                 "confidence": 0,
-                "has_people": False,
-                "has_structures": False,
-                "water_type": "unknown",
                 "recommendations": []
             }
         
