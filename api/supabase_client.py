@@ -484,6 +484,65 @@ def fetch_active_push_tokens_by_barangay(
     return list(dict.fromkeys(valid))
 
 
+def fetch_active_sos_events(
+    client: SupabaseClient,
+    barangay: str | None = None,
+    timeout: int = 10,
+) -> list[dict]:
+    """Fetch active, non-expired SOS events and include requester name for map use."""
+
+    endpoint = f"{client.url}/rest/v1/sos_events"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    params = {
+        "select": "sos_id,user_id,barangay,latitude,longitude,message,status,expires_at,created_at,users(name)",
+        "status": "eq.active",
+        "expires_at": f"gte.{now_iso}",
+        "order": "created_at.desc",
+    }
+    if barangay:
+        params["barangay"] = f"ilike.{barangay.strip()}"
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase SOS query failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase SOS query failed with HTTP {response.status_code}: {response.text}")
+
+    rows = response.json()
+    if not isinstance(rows, list):
+        raise RuntimeError("Unexpected Supabase response format for SOS events.")
+
+    normalized: list[dict] = []
+    for row in rows:
+        user_rel = row.get("users")
+        requester_name = None
+        if isinstance(user_rel, dict):
+            requester_name = user_rel.get("name")
+        elif isinstance(user_rel, list) and user_rel:
+            first = user_rel[0]
+            if isinstance(first, dict):
+                requester_name = first.get("name")
+
+        normalized.append(
+            {
+                "sos_id": row.get("sos_id"),
+                "user_id": row.get("user_id"),
+                "barangay": row.get("barangay"),
+                "latitude": row.get("latitude"),
+                "longitude": row.get("longitude"),
+                "message": row.get("message"),
+                "status": row.get("status"),
+                "expires_at": row.get("expires_at"),
+                "created_at": row.get("created_at"),
+                "requester_name": requester_name,
+            }
+        )
+
+    return normalized
+
+
 def upload_image_to_bucket(
     client: SupabaseClient,
     bucket_name: str,

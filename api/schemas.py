@@ -98,6 +98,21 @@ class SosCreateAndNotifyResponse(BaseModel):
     notification_tickets: list[dict]
 
 
+class SosMapEventResponse(BaseModel):
+    """Active SOS event fields for map rendering, including requester name."""
+
+    sos_id: int
+    user_id: int
+    requester_name: Optional[str] = None
+    barangay: str
+    latitude: float
+    longitude: float
+    message: Optional[str] = None
+    status: Literal["active", "resolved"]
+    expires_at: datetime
+    created_at: datetime
+
+
 class LoginRequest(BaseModel):
     """Credentials for user login."""
 
