@@ -1,6 +1,7 @@
 """Supabase client configuration and connectivity helpers."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import os
 from dataclasses import dataclass
 from typing import Tuple
@@ -282,6 +283,205 @@ def fetch_alerts_by_barangay(
         raise RuntimeError("Unexpected Supabase response format for alerts.")
 
     return payload
+
+
+def upsert_user_push_token(
+    client: SupabaseClient,
+    user_id: int,
+    expo_push_token: str,
+    barangay: str | None = None,
+    timeout: int = 10,
+) -> dict:
+    """Insert or update a user's Expo push token based on current stored value."""
+
+    if not expo_push_token.startswith("ExponentPushToken["):
+        raise RuntimeError("Invalid Expo push token format.")
+
+    endpoint = f"{client.url}/rest/v1/user_push_tokens"
+    select_params = {
+        "select": "id,user_id,barangay,expo_push_token,created_at",
+        "user_id": f"eq.{user_id}",
+        "order": "id.desc",
+        "limit": "1",
+    }
+
+    try:
+        existing_response = client.session.get(endpoint, params=select_params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase token query failed: {exc}") from exc
+
+    if existing_response.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase token query failed with HTTP {existing_response.status_code}: {existing_response.text}"
+        )
+
+    existing_rows = existing_response.json()
+    latest_row = existing_rows[0] if existing_rows else None
+
+    headers = {
+        "Prefer": "return=representation",
+    }
+
+    if latest_row and latest_row.get("expo_push_token") == expo_push_token:
+        update_params = {
+            "user_id": f"eq.{user_id}",
+        }
+        payload = {
+            # Re-touch created_at so token can be treated as active during the next 4-hour window.
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if barangay is not None:
+            payload["barangay"] = barangay
+
+        try:
+            touch_response = client.session.patch(
+                endpoint,
+                params=update_params,
+                json=payload,
+                headers=headers,
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Supabase token refresh failed: {exc}") from exc
+
+        if touch_response.status_code >= 400:
+            raise RuntimeError(
+                f"Supabase token refresh failed with HTTP {touch_response.status_code}: {touch_response.text}"
+            )
+
+        touched_rows = touch_response.json()
+        if not isinstance(touched_rows, list) or not touched_rows:
+            raise RuntimeError("Supabase token refresh did not return updated rows.")
+
+        return {
+            "action": "unchanged",
+            "record": touched_rows[0],
+        }
+
+    if latest_row:
+        update_params = {
+            "user_id": f"eq.{user_id}",
+        }
+        payload = {
+            "expo_push_token": expo_push_token,
+        }
+        if barangay is not None:
+            payload["barangay"] = barangay
+
+        try:
+            update_response = client.session.patch(
+                endpoint,
+                params=update_params,
+                json=payload,
+                headers=headers,
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Supabase token update failed: {exc}") from exc
+
+        if update_response.status_code >= 400:
+            raise RuntimeError(
+                f"Supabase token update failed with HTTP {update_response.status_code}: {update_response.text}"
+            )
+
+        updated_rows = update_response.json()
+        if not isinstance(updated_rows, list) or not updated_rows:
+            raise RuntimeError("Supabase token update did not return updated rows.")
+
+        return {
+            "action": "updated",
+            "record": updated_rows[0],
+        }
+
+    insert_payload = {
+        "user_id": user_id,
+        "expo_push_token": expo_push_token,
+    }
+    if barangay is not None:
+        insert_payload["barangay"] = barangay
+
+    try:
+        insert_response = client.session.post(
+            endpoint,
+            json=insert_payload,
+            headers=headers,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase token insert failed: {exc}") from exc
+
+    if insert_response.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase token insert failed with HTTP {insert_response.status_code}: {insert_response.text}"
+        )
+
+    inserted_rows = insert_response.json()
+    if not isinstance(inserted_rows, list) or not inserted_rows:
+        raise RuntimeError("Supabase token insert did not return the created row.")
+
+    return {
+        "action": "inserted",
+        "record": inserted_rows[0],
+    }
+
+
+def insert_sos_event(client: SupabaseClient, event: dict, timeout: int = 10) -> dict:
+    """Insert one SOS event row and return the created record."""
+
+    endpoint = f"{client.url}/rest/v1/sos_events"
+    headers = {
+        "Prefer": "return=representation",
+    }
+
+    try:
+        response = client.session.post(endpoint, json=event, headers=headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase SOS insert failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase SOS insert failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError("Supabase SOS insert did not return the created event.")
+
+    return payload[0]
+
+
+def fetch_active_push_tokens_by_barangay(
+    client: SupabaseClient,
+    barangay: str,
+    exclude_user_id: int,
+    active_within_hours: int = 4,
+    timeout: int = 10,
+) -> list[str]:
+    """Fetch active Expo push tokens in a barangay, excluding the SOS sender."""
+
+    endpoint = f"{client.url}/rest/v1/user_push_tokens"
+    active_since = (datetime.now(timezone.utc) - timedelta(hours=active_within_hours)).isoformat()
+    params = {
+        "select": "expo_push_token",
+        "barangay": f"ilike.{barangay.strip()}",
+        "user_id": f"neq.{exclude_user_id}",
+        "created_at": f"gte.{active_since}",
+        "order": "id.desc",
+    }
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase push-token query failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase push-token query failed with HTTP {response.status_code}: {response.text}")
+
+    rows = response.json()
+    if not isinstance(rows, list):
+        raise RuntimeError("Unexpected Supabase response format for push tokens.")
+
+    tokens = [row.get("expo_push_token", "") for row in rows]
+    valid = [token for token in tokens if isinstance(token, str) and token.startswith("ExponentPushToken[")]
+    return list(dict.fromkeys(valid))
 
 
 def upload_image_to_bucket(

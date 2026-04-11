@@ -3,8 +3,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 import bcrypt
 
-from ..schemas import UserCreateRequest, UserResponse
-from ..supabase_client import fetch_users, insert_user
+from ..schemas import (
+    UserCreateRequest,
+    UserPushTokenUpsertRequest,
+    UserPushTokenUpsertResponse,
+    UserResponse,
+)
+from ..supabase_client import fetch_users, insert_user, upsert_user_push_token
 
 router = APIRouter(tags=["users"])
 
@@ -41,3 +46,25 @@ def create_user(payload: UserCreateRequest, request: Request):
         return insert_user(supabase_client, data)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/users/push-token", response_model=UserPushTokenUpsertResponse)
+def register_or_update_push_token(payload: UserPushTokenUpsertRequest, request: Request):
+    """Insert user's push token or replace stored token if changed."""
+
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    try:
+        return upsert_user_push_token(
+            supabase_client,
+            user_id=payload.user_id,
+            expo_push_token=payload.expo_push_token,
+            barangay=payload.barangay,
+        )
+    except RuntimeError as exc:
+        detail = str(exc)
+        if detail == "Invalid Expo push token format.":
+            raise HTTPException(status_code=400, detail=detail) from exc
+        raise HTTPException(status_code=502, detail=detail) from exc

@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Dict, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ManualPredictionRequest(BaseModel):
@@ -33,6 +33,69 @@ class UserCreateRequest(BaseModel):
     name: str
     barangay: str
     password: str
+
+
+class UserPushTokenUpsertRequest(BaseModel):
+    """Payload contract for registering/updating a user's Expo push token."""
+
+    user_id: int
+    barangay: Optional[str] = None
+    expo_push_token: str
+
+
+class UserPushTokenUpsertResponse(BaseModel):
+    """Result returned after token registration/update checks."""
+
+    action: Literal["inserted", "updated", "unchanged"]
+    record: dict
+
+
+class SosEventCreateRequest(BaseModel):
+    """Payload contract for creating an SOS event and triggering alerts."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_id: int = Field(alias="userId")
+    barangay: str
+    latitude: float
+    longitude: float
+    timestamp: Optional[datetime] = None
+    message: Optional[str] = None
+    status: Literal["active", "resolved"] = "active"
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def parse_user_id(cls, value):
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            digits = "".join(ch for ch in value if ch.isdigit())
+            if digits:
+                return int(digits)
+        raise ValueError("userId must contain a numeric user id.")
+
+
+class SosEventResponse(BaseModel):
+    """Serialized SOS event row returned after creation."""
+
+    sos_id: int
+    user_id: int
+    barangay: str
+    latitude: float
+    longitude: float
+    message: Optional[str] = None
+    status: Literal["active", "resolved"]
+    expires_at: datetime
+    created_at: datetime
+
+
+class SosCreateAndNotifyResponse(BaseModel):
+    """Combined SOS creation response with notification dispatch summary."""
+
+    sos_event: SosEventResponse
+    recipients_total: int
+    notifications_sent: int
+    notification_tickets: list[dict]
 
 
 class LoginRequest(BaseModel):
