@@ -484,6 +484,40 @@ def fetch_active_push_tokens_by_barangay(
     return list(dict.fromkeys(valid))
 
 
+def fetch_push_tokens_by_barangay(
+    client: SupabaseClient,
+    barangay: str,
+    active_within_hours: int = 4,
+    timeout: int = 10,
+) -> list[str]:
+    """Fetch active Expo push tokens in a barangay for general alert broadcasts."""
+
+    endpoint = f"{client.url}/rest/v1/user_push_tokens"
+    active_since = (datetime.now(timezone.utc) - timedelta(hours=active_within_hours)).isoformat()
+    params = {
+        "select": "expo_push_token",
+        "barangay": f"ilike.{barangay.strip()}",
+        "created_at": f"gte.{active_since}",
+        "order": "id.desc",
+    }
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase push-token query failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase push-token query failed with HTTP {response.status_code}: {response.text}")
+
+    rows = response.json()
+    if not isinstance(rows, list):
+        raise RuntimeError("Unexpected Supabase response format for push tokens.")
+
+    tokens = [row.get("expo_push_token", "") for row in rows]
+    valid = [token for token in tokens if isinstance(token, str) and token.startswith("ExponentPushToken[")]
+    return list(dict.fromkeys(valid))
+
+
 def fetch_active_sos_events(
     client: SupabaseClient,
     barangay: str | None = None,

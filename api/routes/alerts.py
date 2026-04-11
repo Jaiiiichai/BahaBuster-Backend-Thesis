@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..schemas import AlertCreateRequest, AlertResponse
-from ..supabase_client import fetch_alerts_by_barangay, insert_alert
+from ..supabase_client import fetch_alerts_by_barangay, fetch_push_tokens_by_barangay, insert_alert
 
 router = APIRouter(tags=["alerts"])
 
@@ -14,6 +14,7 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts"
 DEFAULT_EXPO_PUSH_TOKEN = os.getenv("EXPO_PUSH_TOKEN", "")
 MAX_EXPO_BATCH_SIZE = 1000
+ALERT_NOTIFICATION_ACTIVE_HOURS = 4
 
 
 class ExpoNotificationRequest(BaseModel):
@@ -155,9 +156,43 @@ def create_alert(payload: AlertCreateRequest, request: Request):
         raise HTTPException(status_code=503, detail="Supabase is not configured.")
 
     try:
-        return insert_alert(supabase_client, payload.model_dump(mode="json"))
+        created_alert = insert_alert(supabase_client, payload.model_dump(mode="json"))
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        recipient_tokens = fetch_push_tokens_by_barangay(
+            supabase_client,
+            barangay=created_alert.get("location", payload.location),
+            active_within_hours=ALERT_NOTIFICATION_ACTIVE_HOURS,
+        )
+        if recipient_tokens:
+            alert_title = (created_alert.get("title") or "Barangay Alert").strip()
+            alert_body = (
+                (created_alert.get("description") or payload.description or created_alert.get("title") or "")
+                .strip()
+            )
+            if not alert_body:
+                alert_body = f"New alert in {created_alert.get('location', payload.location)}."
+
+            send_batch_notifications(
+                ExpoBatchNotificationRequest(
+                    tokens=recipient_tokens,
+                    title=alert_title,
+                    body=alert_body,
+                    data={
+                        "type": "alert",
+                        "alert_id": created_alert.get("id"),
+                        "location": created_alert.get("location", payload.location),
+                        "severity": created_alert.get("severity"),
+                        "status": created_alert.get("status"),
+                    },
+                )
+            )
+    except (RuntimeError, HTTPException) as exc:
+        print(f"Alert notification dispatch failed: {exc}")
+
+    return created_alert
 
 
 @router.get("/alerts", response_model=list[AlertResponse])
