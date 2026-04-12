@@ -1,4 +1,6 @@
 """Application factory and router wiring for the Flood Prediction API."""
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,10 +12,14 @@ def create_app() -> FastAPI:
     """Instantiate the FastAPI application with middleware and routers."""
 
     app = FastAPI(title="Flood Prediction System")
+    verify_on_startup = os.getenv("SUPABASE_VERIFY_ON_STARTUP", "0").strip().lower() in {"1", "true", "yes"}
 
     try:
         supabase_client = create_supabase_client()
-        is_connected, message = verify_supabase_connection()
+        if verify_on_startup:
+            is_connected, message = verify_supabase_connection(timeout=3)
+        else:
+            is_connected, message = True, "Startup verification skipped (SUPABASE_VERIFY_ON_STARTUP=0)."
         app.state.supabase = supabase_client
         app.state.supabase_status = {
             "configured": True,
