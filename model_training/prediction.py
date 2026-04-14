@@ -11,14 +11,14 @@ from .features import create_features
 from .registry import get_model_for_barangay
 
 
-def risk_level(probability: float) -> str:
-    """Convert a flood probability into the categorical risk buckets used downstream."""
+def risk_level(depth_cm: float) -> str:
+    """Convert predicted flood depth (cm) into categorical risk buckets."""
 
-    if probability < 0.2:
+    if depth_cm < 10:
         return "LOW"
-    if probability < 0.5:
+    if depth_cm < 30:
         return "MODERATE"
-    if probability > 0.5:
+    if depth_cm < 60:
         return "HIGH"
     return "SEVERE"
 
@@ -71,7 +71,7 @@ def run_manual_prediction(feature_map: Dict[str, float], model_bundle: dict) -> 
     prob = (rf_prob + xgb_prob) / 2
 
     flood = int(prob > CLASSIFICATION_THRESHOLD)
-    depth = float(reg_model.predict(X)[0]) if reg_model is not None and flood == 1 else 0.0
+    depth = float(reg_model.predict(X)[0]) if reg_model is not None else 0.0
 
     return row, float(prob), depth, flood
 
@@ -105,8 +105,8 @@ def predict_with_weather(
         xgb_prob = xgb_model.predict_proba(X[features])[0][1]
         prob = (rf_prob + xgb_prob) / 2
         flood = int(prob > CLASSIFICATION_THRESHOLD)
-        depth = float(reg_model.predict(X[features])[0]) if reg_model is not None and flood == 1 else 0.0
-        rl = risk_level(prob)
+        depth = float(reg_model.predict(X[features])[0]) if reg_model is not None else 0.0
+        rl = risk_level(depth)
 
         results.append(
             {
@@ -148,7 +148,7 @@ def manual_prediction_response(
         if actual_depth_cm is not None:
             actuals["depth_error_cm"] = None if depth is None else round(actual_depth_cm - depth, 2)
 
-    rl = risk_level(prob)
+    rl = risk_level(depth)
     prediction = {
         "flood_probability": round(prob, 4),
         "predicted_depth_cm": round(depth, 2),
