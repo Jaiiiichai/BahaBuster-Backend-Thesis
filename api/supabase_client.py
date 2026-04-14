@@ -318,13 +318,28 @@ def upsert_user_push_token(
     existing_rows = existing_response.json()
     latest_row = existing_rows[0] if existing_rows else None
 
+    def _cleanup_old_rows(keep_id: int) -> None:
+        delete_params = {
+            "user_id": f"eq.{user_id}",
+            "id": f"neq.{keep_id}",
+        }
+        try:
+            cleanup_response = client.session.delete(endpoint, params=delete_params, timeout=timeout)
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Supabase token cleanup failed: {exc}") from exc
+
+        if cleanup_response.status_code >= 400:
+            raise RuntimeError(
+                f"Supabase token cleanup failed with HTTP {cleanup_response.status_code}: {cleanup_response.text}"
+            )
+
     headers = {
         "Prefer": "return=representation",
     }
 
     if latest_row and latest_row.get("expo_push_token") == expo_push_token:
         update_params = {
-            "user_id": f"eq.{user_id}",
+            "id": f"eq.{latest_row['id']}",
         }
         payload = {
             # Re-touch created_at so token can be treated as active during the next 4-hour window.
@@ -353,6 +368,8 @@ def upsert_user_push_token(
         if not isinstance(touched_rows, list) or not touched_rows:
             raise RuntimeError("Supabase token refresh did not return updated rows.")
 
+        _cleanup_old_rows(keep_id=touched_rows[0]["id"])
+
         return {
             "action": "unchanged",
             "record": touched_rows[0],
@@ -360,10 +377,11 @@ def upsert_user_push_token(
 
     if latest_row:
         update_params = {
-            "user_id": f"eq.{user_id}",
+            "id": f"eq.{latest_row['id']}",
         }
         payload = {
             "expo_push_token": expo_push_token,
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         if barangay is not None:
             payload["barangay"] = barangay
@@ -387,6 +405,8 @@ def upsert_user_push_token(
         updated_rows = update_response.json()
         if not isinstance(updated_rows, list) or not updated_rows:
             raise RuntimeError("Supabase token update did not return updated rows.")
+
+        _cleanup_old_rows(keep_id=updated_rows[0]["id"])
 
         return {
             "action": "updated",
@@ -418,6 +438,8 @@ def upsert_user_push_token(
     inserted_rows = insert_response.json()
     if not isinstance(inserted_rows, list) or not inserted_rows:
         raise RuntimeError("Supabase token insert did not return the created row.")
+
+    _cleanup_old_rows(keep_id=inserted_rows[0]["id"])
 
     return {
         "action": "inserted",
