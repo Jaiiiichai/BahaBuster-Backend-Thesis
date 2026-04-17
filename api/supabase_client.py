@@ -256,6 +256,32 @@ def insert_alert(client: SupabaseClient, alert: dict, timeout: int = 10) -> dict
     return payload[0]
 
 
+def update_alert_acknowledged(client: SupabaseClient, alert_id: int, acknowledged: bool, timeout: int = 10) -> dict:
+    """Update the acknowledged field of a specific alert row and return the updated record."""
+
+    endpoint = f"{client.url}/rest/v1/alerts"
+    headers = {
+        "Prefer": "return=representation",
+    }
+    params = {"id": f"eq.{alert_id}"}
+
+    try:
+        response = client.session.patch(
+            endpoint, json={"acknowledged": acknowledged}, headers=headers, params=params, timeout=timeout
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase alert update failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase alert update failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError(f"Alert with id {alert_id} not found.")
+
+    return payload[0]
+
+
 def fetch_alerts_by_barangay(
     client: SupabaseClient,
     barangay: str,

@@ -5,8 +5,8 @@ import requests
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from ..schemas import AlertCreateRequest, AlertResponse
-from ..supabase_client import fetch_alerts_by_barangay, fetch_push_tokens_by_barangay, insert_alert
+from ..schemas import AlertAcknowledgeRequest, AlertCreateRequest, AlertResponse
+from ..supabase_client import fetch_alerts_by_barangay, fetch_push_tokens_by_barangay, insert_alert, update_alert_acknowledged
 
 router = APIRouter(tags=["alerts"])
 
@@ -210,6 +210,22 @@ def get_alerts_by_barangay(
         return fetch_alerts_by_barangay(supabase_client, barangay)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.patch("/alerts/{alert_id}/acknowledge", response_model=AlertResponse)
+def acknowledge_alert(alert_id: int, payload: AlertAcknowledgeRequest, request: Request):
+    """Update the acknowledged field of a specific alert."""
+
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    try:
+        return update_alert_acknowledged(supabase_client, alert_id, payload.acknowledged)
+    except RuntimeError as exc:
+        msg = str(exc)
+        status = 404 if "not found" in msg.lower() else 502
+        raise HTTPException(status_code=status, detail=msg) from exc
 
 
 @router.post("/send")

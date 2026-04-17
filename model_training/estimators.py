@@ -5,7 +5,7 @@ from typing import Tuple
 
 import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from xgboost import XGBClassifier
 
 
@@ -55,3 +55,18 @@ def fit_regressor(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestRegr
     )
     reg_model.fit(X_train, y_train)
     return reg_model
+
+
+def fit_quantile_regressor(X_train: pd.DataFrame, y_train: pd.Series, quantile: float) -> GradientBoostingRegressor:
+    """Train a quantile regressor for conditional flood-depth distribution estimates."""
+
+    q_model = GradientBoostingRegressor(
+        loss="quantile",
+        alpha=quantile,
+        n_estimators=250,
+        max_depth=3,
+        learning_rate=0.05,
+        random_state=42,
+    )
+    q_model.fit(X_train, y_train)
+    return q_model

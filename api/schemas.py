@@ -166,6 +166,12 @@ class AlertCreateRequest(BaseModel):
     acknowledged: bool = False
 
 
+class AlertAcknowledgeRequest(BaseModel):
+    """Payload contract for updating the acknowledged field of an alert."""
+
+    acknowledged: bool
+
+
 class AlertResponse(BaseModel):
     """Serialized alert row returned by the alerts endpoints."""
 

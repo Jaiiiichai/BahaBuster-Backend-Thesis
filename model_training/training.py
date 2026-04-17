@@ -14,7 +14,7 @@ from .evaluation import (
     evaluate_temporal_classification_holdout,
     evaluate_temporal_regression_holdout,
 )
-from .estimators import fit_classifiers, fit_regressor
+from .estimators import fit_classifiers, fit_quantile_regressor, fit_regressor
 from .features import create_features
 from .naming import barangay_model_path, normalize_barangay_name
 
@@ -105,6 +105,8 @@ def train_barangay_model(barangay_name: str, df: pd.DataFrame, features: list[st
     rf_model, xgb_model = fit_classifiers(X, y)
 
     reg_model = None
+    reg_q50_model = None
+    reg_q90_model = None
     reg_metrics: Dict[str, Optional[float]] = {"mae_cm": None, "r2": None}
 
     reg_mask = df[TARGET_REG] >= 1
@@ -118,6 +120,8 @@ def train_barangay_model(barangay_name: str, df: pd.DataFrame, features: list[st
         reg_metrics.setdefault("r2", None)
 
         reg_model = fit_regressor(X_reg, y_reg)
+        reg_q50_model = fit_quantile_regressor(X_reg, y_reg, quantile=0.5)
+        reg_q90_model = fit_quantile_regressor(X_reg, y_reg, quantile=0.9)
     else:
         print(f"[REGRESSION] Skipped for {normalized_name}: insufficient depth samples.")
 
@@ -128,6 +132,8 @@ def train_barangay_model(barangay_name: str, df: pd.DataFrame, features: list[st
         "rf": rf_model,
         "xgb": xgb_model,
         "reg": reg_model,
+        "reg_q50": reg_q50_model,
+        "reg_q90": reg_q90_model,
         "features": features,
         "metrics": metrics,
     }
