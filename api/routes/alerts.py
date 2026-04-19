@@ -4,9 +4,22 @@ import os
 import requests
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from model_training import ModelNotFoundError, predict_with_weather
 
-from ..schemas import AlertAcknowledgeRequest, AlertCreateRequest, AlertResponse
-from ..supabase_client import fetch_alerts_by_barangay, fetch_push_tokens_by_barangay, insert_alert, update_alert_acknowledged
+from ..openai_client import OpenAIIntegrationError, generate_alert_copy_from_flood_data
+from ..schemas import (
+    AlertAcknowledgeRequest,
+    AlertCreateRequest,
+    AlertResponse,
+    AutoAlertGenerateResponse,
+)
+from ..supabase_client import (
+    fetch_alerts_by_barangay,
+    fetch_flood_reports_by_barangay,
+    fetch_push_tokens_by_barangay,
+    insert_alert,
+    update_alert_acknowledged,
+)
 
 router = APIRouter(tags=["alerts"])
 
@@ -193,6 +206,57 @@ def create_alert(payload: AlertCreateRequest, request: Request):
         print(f"Alert notification dispatch failed: {exc}")
 
     return created_alert
+
+
+@router.get("/alerts/auto-generate/{barangay}", response_model=AutoAlertGenerateResponse)
+def auto_generate_alert(barangay: str, request: Request):
+    """Generate alert title and description from barangay flood prediction/report data."""
+
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    try:
+        prediction = predict_with_weather(barangay)
+    except ModelNotFoundError as exc:
+        available = ", ".join(exc.available) or "none"
+        raise HTTPException(
+            status_code=404,
+            detail=f"No trained model for barangay '{barangay}'. Available: {available}.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch prediction data: {exc}") from exc
+
+    try:
+        recent_reports = fetch_flood_reports_by_barangay(supabase_client, barangay, timeout=10)
+    except RuntimeError:
+        recent_reports = []
+
+    generated = None
+    try:
+        generated = generate_alert_copy_from_flood_data(
+            barangay=barangay,
+            prediction=prediction,
+            recent_reports=recent_reports,
+        )
+    except OpenAIIntegrationError:
+        day1 = (prediction.get("predictions") or [{}])[0]
+        generated = {
+            "title": f"Flood Alert: {barangay}",
+            "description": (
+                f"Forecast indicates {day1.get('risk_level', 'LOW')} flood risk in {barangay}. "
+                f"Expected depth is around {day1.get('predicted_depth_cm', 0)} cm. Stay alert and monitor updates."
+            ),
+            "severity": "moderate",
+            "reason": "OpenAI unavailable, used prediction-based fallback copy.",
+        }
+
+    return {
+        "title": generated["title"],
+        "description": generated["description"],
+    }
 
 
 @router.get("/alerts", response_model=list[AlertResponse])

@@ -185,6 +185,13 @@ class AlertResponse(BaseModel):
     created_at: datetime
 
 
+class AutoAlertGenerateResponse(BaseModel):
+    """Result returned after automatic alert generation from prediction + OpenAI."""
+
+    title: str
+    description: str
+
+
 class ImageAnalysisResponse(BaseModel):
     """Response from image flood analysis."""
 

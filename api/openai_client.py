@@ -2,7 +2,7 @@
 import logging
 import os
 import json
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from openai import OpenAI, APIError
 import base64
 from PIL import Image
@@ -153,5 +153,88 @@ def analyze_flood_image(
     except Exception as exc:
         logger.error(f"Unexpected error in image analysis: {exc}", exc_info=True)
         raise OpenAIIntegrationError(f"Failed to analyze image: {str(exc)}") from exc
+
+
+def _safe_json_dict(raw_text: str) -> dict[str, Any]:
+    """Parse a JSON object from model text output, tolerating fenced responses."""
+
+    text = (raw_text or "").strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3:
+            text = "\n".join(lines[1:-1]).strip()
+
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("Expected JSON object response from OpenAI.")
+    return parsed
+
+
+def generate_alert_copy_from_flood_data(
+    barangay: str,
+    prediction: Dict[str, Any],
+    recent_reports: Optional[list[dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Generate alert title/description/severity from current barangay flood data."""
+
+    try:
+        client = get_openai_client()
+        reports = recent_reports or []
+        context_payload = {
+            "barangay": barangay,
+            "prediction": prediction,
+            "recent_reports": reports[:3],
+        }
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.2,
+            max_tokens=400,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a disaster-risk assistant for barangay flood alerts. "
+                        "Write concise, clear, public-safety alert copy."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Create an alert draft from this JSON data. Respond only as valid JSON with this schema: "
+                        '{"title": string, "description": string, "severity": "critical"|"moderate"|"low", "reason": string}. '
+                        "Do not invent fields and keep description under 320 characters. "
+                        f"Data: {json.dumps(context_payload, ensure_ascii=True)}"
+                    ),
+                },
+            ],
+        )
+
+        response_text = response.choices[0].message.content
+        parsed = _safe_json_dict(response_text)
+
+        title = str(parsed.get("title") or "Flood Alert").strip()[:120]
+        description = str(parsed.get("description") or "Monitor flood conditions and stay prepared.").strip()[:320]
+        severity = str(parsed.get("severity") or "low").strip().lower()
+        reason = str(parsed.get("reason") or "Generated from prediction data.").strip()[:240]
+
+        if severity not in {"critical", "moderate", "low"}:
+            severity = "low"
+
+        return {
+            "title": title or "Flood Alert",
+            "description": description or "Monitor flood conditions and stay prepared.",
+            "severity": severity,
+            "reason": reason or "Generated from prediction data.",
+        }
+
+    except APIError as api_error:
+        logger.error(f"OpenAI API error during alert generation: {api_error}")
+        raise OpenAIIntegrationError(f"OpenAI API error: {str(api_error)}") from api_error
+    except OpenAIIntegrationError:
+        raise
+    except Exception as exc:
+        logger.error(f"Unexpected error in alert generation: {exc}", exc_info=True)
+        raise OpenAIIntegrationError(f"Failed to generate alert copy: {str(exc)}") from exc
 
 
