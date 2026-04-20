@@ -496,21 +496,17 @@ def insert_sos_event(client: SupabaseClient, event: dict, timeout: int = 10) -> 
     return payload[0]
 
 
-def fetch_active_push_tokens_by_barangay(
+def fetch_active_push_tokens_for_sos(
     client: SupabaseClient,
-    barangay: str,
-    exclude_user_id: int,
     active_within_hours: int = 4,
     timeout: int = 10,
 ) -> list[str]:
-    """Fetch active Expo push tokens in a barangay, excluding the SOS sender."""
+    """Fetch active Expo push tokens for SOS fanout, including the SOS sender."""
 
     endpoint = f"{client.url}/rest/v1/user_push_tokens"
     active_since = (datetime.now(timezone.utc) - timedelta(hours=active_within_hours)).isoformat()
     params = {
         "select": "expo_push_token",
-        "barangay": f"ilike.{barangay.strip()}",
-        "user_id": f"neq.{exclude_user_id}",
         "created_at": f"gte.{active_since}",
         "order": "id.desc",
     }

@@ -1,11 +1,11 @@
-"""SOS endpoints for emergency events and barangay push fanout."""
+"""SOS endpoints for emergency events and push fanout."""
 from datetime import datetime, timedelta, timezone
 
 import requests
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..schemas import SosCreateAndNotifyResponse, SosEventCreateRequest, SosMapEventResponse
-from ..supabase_client import fetch_active_push_tokens_by_barangay, fetch_active_sos_events, insert_sos_event
+from ..supabase_client import fetch_active_push_tokens_for_sos, fetch_active_sos_events, insert_sos_event
 
 router = APIRouter(tags=["sos"])
 
@@ -61,7 +61,7 @@ def _send_batch_to_expo(tokens: list[str], title: str, body: str, data: dict) ->
 
 @router.post("/sos", response_model=SosCreateAndNotifyResponse, status_code=201)
 def create_sos_event(payload: SosEventCreateRequest, request: Request):
-    """Create SOS event, then notify active token holders in the same barangay except sender."""
+    """Create an SOS event, then notify all active token holders, including the sender."""
 
     supabase_client = getattr(request.app.state, "supabase", None)
     if supabase_client is None:
@@ -84,10 +84,8 @@ def create_sos_event(payload: SosEventCreateRequest, request: Request):
 
     try:
         sos_event = insert_sos_event(supabase_client, sos_row)
-        recipient_tokens = fetch_active_push_tokens_by_barangay(
+        recipient_tokens = fetch_active_push_tokens_for_sos(
             supabase_client,
-            barangay=payload.barangay,
-            exclude_user_id=payload.user_id,
             active_within_hours=TOKEN_ACTIVE_WINDOW_HOURS,
         )
     except RuntimeError as exc:
