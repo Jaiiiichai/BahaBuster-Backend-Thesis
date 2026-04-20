@@ -562,11 +562,7 @@ def fetch_push_tokens_by_barangay(
     return list(dict.fromkeys(valid))
 
 
-def fetch_active_sos_events(
-    client: SupabaseClient,
-    barangay: str | None = None,
-    timeout: int = 10,
-) -> list[dict]:
+def fetch_active_sos_events(client: SupabaseClient, timeout: int = 10) -> list[dict]:
     """Fetch active, non-expired SOS events and include requester name for map use."""
 
     endpoint = f"{client.url}/rest/v1/sos_events"
@@ -577,8 +573,6 @@ def fetch_active_sos_events(
         "expires_at": f"gte.{now_iso}",
         "order": "created_at.desc",
     }
-    if barangay:
-        params["barangay"] = f"ilike.{barangay.strip()}"
 
     try:
         response = client.session.get(endpoint, params=params, timeout=timeout)

@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 import requests
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from ..schemas import SosCreateAndNotifyResponse, SosEventCreateRequest, SosMapEventResponse
 from ..supabase_client import fetch_active_push_tokens_for_sos, fetch_active_sos_events, insert_sos_event
@@ -122,10 +122,7 @@ def create_sos_event(payload: SosEventCreateRequest, request: Request):
 
 
 @router.get("/sos", response_model=list[SosMapEventResponse])
-def get_active_sos_events(
-    request: Request,
-    barangay: str | None = Query(default=None, description="Optional barangay filter"),
-):
+def get_active_sos_events(request: Request):
     """Return active, non-expired SOS points for map display with requester name."""
 
     supabase_client = getattr(request.app.state, "supabase", None)
@@ -133,6 +130,6 @@ def get_active_sos_events(
         raise HTTPException(status_code=503, detail="Supabase is not configured.")
 
     try:
-        return fetch_active_sos_events(supabase_client, barangay=barangay)
+        return fetch_active_sos_events(supabase_client)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
