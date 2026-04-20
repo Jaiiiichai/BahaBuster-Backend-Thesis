@@ -499,9 +499,10 @@ def insert_sos_event(client: SupabaseClient, event: dict, timeout: int = 10) -> 
 def fetch_active_push_tokens_for_sos(
     client: SupabaseClient,
     active_within_hours: int = 4,
+    exclude_user_id: int | None = None,
     timeout: int = 10,
 ) -> list[str]:
-    """Fetch active Expo push tokens for SOS fanout, including the SOS sender."""
+    """Fetch active Expo push tokens for SOS fanout, excluding the SOS sender."""
 
     endpoint = f"{client.url}/rest/v1/user_push_tokens"
     active_since = (datetime.now(timezone.utc) - timedelta(hours=active_within_hours)).isoformat()
@@ -510,6 +511,8 @@ def fetch_active_push_tokens_for_sos(
         "created_at": f"gte.{active_since}",
         "order": "id.desc",
     }
+    if exclude_user_id is not None:
+        params["user_id"] = f"neq.{exclude_user_id}"
 
     try:
         response = client.session.get(endpoint, params=params, timeout=timeout)

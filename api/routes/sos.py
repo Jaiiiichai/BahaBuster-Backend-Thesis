@@ -61,7 +61,7 @@ def _send_batch_to_expo(tokens: list[str], title: str, body: str, data: dict) ->
 
 @router.post("/sos", response_model=SosCreateAndNotifyResponse, status_code=201)
 def create_sos_event(payload: SosEventCreateRequest, request: Request):
-    """Create an SOS event, then notify all active token holders, including the sender."""
+    """Create an SOS event, then notify all active token holders except the sender."""
 
     supabase_client = getattr(request.app.state, "supabase", None)
     if supabase_client is None:
@@ -87,6 +87,7 @@ def create_sos_event(payload: SosEventCreateRequest, request: Request):
         recipient_tokens = fetch_active_push_tokens_for_sos(
             supabase_client,
             active_within_hours=TOKEN_ACTIVE_WINDOW_HOURS,
+            exclude_user_id=payload.user_id,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
