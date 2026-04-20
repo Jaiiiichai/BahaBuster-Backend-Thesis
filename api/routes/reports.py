@@ -1,5 +1,5 @@
 """Flood report endpoints backed by Supabase."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -7,6 +7,7 @@ from ..schemas import FloodReportCreateRequest, FloodReportResponse
 from ..supabase_client import fetch_flood_reports_by_barangay, insert_flood_report
 
 router = APIRouter(tags=["reports"])
+PH_TIMEZONE = timezone(timedelta(hours=8))
 
 
 @router.post("/reports", response_model=FloodReportResponse, status_code=201)
@@ -19,7 +20,7 @@ def create_report(payload: FloodReportCreateRequest, request: Request):
 
     try:
         report_payload = payload.model_dump(mode="json")
-        report_payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+        report_payload["timestamp"] = datetime.now(PH_TIMEZONE).isoformat()
         report = insert_flood_report(supabase_client, report_payload)
         return report
     except RuntimeError as exc:

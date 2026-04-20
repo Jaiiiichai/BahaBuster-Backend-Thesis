@@ -107,9 +107,15 @@ def analyze_flood_image(
                             "type": "text",
                             "text": f"""{context}Analyze this image and determine if it shows flooding. Respond ONLY with valid JSON (no markdown, no other text):
 
+Writing rules for "description" and "short_summary":
+- Write from a first-person resident perspective.
+- Sound human and direct, like someone reporting what they are seeing nearby.
+- Never start any sentence with phrases like "This image shows", "The image shows", "This photo shows", "The photo shows", or similar wording.
+- Avoid third-person camera narration.
+
 {{
     "is_flood": boolean - true if image shows flooding or large water accumulation,
-    "description": "2-3 sentence detailed description of flood conditions if it's a flood and answer like you are a resident reporting the flood and humanize it like a real person would, otherwise explanation why it's not",
+    "description": "2-3 sentence detailed description in first-person resident voice if it's a flood; if not flood, explain why in first-person without using image-narrator phrasing",
     "short_summary": "1 sentence summary (max 80 characters)",
     "severity": "mild", "moderate", or "severe" (only if is_flood is true, else "none"),
     "confidence": number 0-100 indicating how confident you are,
