@@ -565,8 +565,29 @@ def fetch_push_tokens_by_barangay(
     return list(dict.fromkeys(valid))
 
 
+def expire_elapsed_sos_events(client: SupabaseClient, timeout: int = 10) -> None:
+    """Mark SOS events as expired when their expiration timestamp has passed."""
+
+    endpoint = f"{client.url}/rest/v1/sos_events"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    params = {
+        "status": "eq.active",
+        "expires_at": f"lt.{now_iso}",
+    }
+
+    try:
+        response = client.session.patch(endpoint, params=params, json={"status": "expired"}, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase SOS expiry update failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase SOS expiry update failed with HTTP {response.status_code}: {response.text}")
+
+
 def fetch_active_sos_events(client: SupabaseClient, timeout: int = 10) -> list[dict]:
     """Fetch active, non-expired SOS events and include requester name for map use."""
+
+    expire_elapsed_sos_events(client, timeout=timeout)
 
     endpoint = f"{client.url}/rest/v1/sos_events"
     now_iso = datetime.now(timezone.utc).isoformat()
