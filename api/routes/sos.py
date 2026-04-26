@@ -5,7 +5,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request
 
 from ..schemas import SosCreateAndNotifyResponse, SosEventCreateRequest, SosMapEventResponse
-from ..supabase_client import fetch_active_push_tokens_for_sos, fetch_active_sos_events, insert_sos_event
+from ..supabase_client import fetch_active_push_tokens_for_sos, fetch_active_sos_by_user, fetch_active_sos_events, insert_sos_event
 
 router = APIRouter(tags=["sos"])
 
@@ -66,6 +66,17 @@ def create_sos_event(payload: SosEventCreateRequest, request: Request):
     supabase_client = getattr(request.app.state, "supabase", None)
     if supabase_client is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    try:
+        existing = fetch_active_sos_by_user(supabase_client, user_id=payload.user_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have an active SOS.",
+        )
 
     created_at = payload.timestamp or datetime.now(timezone.utc)
     if created_at.tzinfo is None:

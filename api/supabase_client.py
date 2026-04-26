@@ -565,6 +565,32 @@ def fetch_push_tokens_by_barangay(
     return list(dict.fromkeys(valid))
 
 
+def fetch_active_sos_by_user(client: SupabaseClient, user_id: int, timeout: int = 10) -> dict | None:
+    """Return the first active, non-expired SOS event for the given user, or None."""
+
+    endpoint = f"{client.url}/rest/v1/sos_events"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    params = {
+        "select": "sos_id,expires_at",
+        "user_id": f"eq.{user_id}",
+        "status": "eq.active",
+        "expires_at": f"gte.{now_iso}",
+        "order": "created_at.desc",
+        "limit": "1",
+    }
+
+    try:
+        response = client.session.get(endpoint, params=params, timeout=timeout)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Supabase SOS duplicate check failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase SOS duplicate check failed with HTTP {response.status_code}: {response.text}")
+
+    rows = response.json()
+    return rows[0] if rows else None
+
+
 def expire_elapsed_sos_events(client: SupabaseClient, timeout: int = 10) -> None:
     """Mark SOS events as expired when their expiration timestamp has passed."""
 
