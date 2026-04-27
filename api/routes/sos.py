@@ -7,7 +7,29 @@ from fastapi import APIRouter, HTTPException, Request
 from ..schemas import SosCreateAndNotifyResponse, SosEventCreateRequest, SosMapEventResponse
 from ..supabase_client import fetch_active_push_tokens_for_sos, fetch_active_sos_by_user, fetch_active_sos_events, insert_sos_event
 
+from fastapi import status
+
 router = APIRouter(tags=["sos"])
+@router.delete("/sos/{sos_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sos_event(sos_id: int, request: Request):
+    """Delete an SOS event by its ID."""
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    endpoint = f"{supabase_client.url}/rest/v1/sos_events"
+    params = {"sos_id": f"eq.{sos_id}"}
+    try:
+        response = supabase_client.session.delete(endpoint, params=params)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Supabase SOS delete failed: {exc}") from exc
+
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="SOS event not found.")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase SOS delete failed with HTTP {response.status_code}: {response.text}")
+    # No content returned on success
+    return
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 MAX_EXPO_BATCH_SIZE = 100

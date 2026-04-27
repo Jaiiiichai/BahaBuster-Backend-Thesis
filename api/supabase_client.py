@@ -602,7 +602,7 @@ def expire_elapsed_sos_events(client: SupabaseClient, timeout: int = 10) -> None
     }
 
     try:
-        response = client.session.patch(endpoint, params=params, json={"status": "expired"}, timeout=timeout)
+        response = client.session.patch(endpoint, params=params, json={"status": "resolved"}, timeout=timeout)
     except requests.RequestException as exc:
         raise RuntimeError(f"Supabase SOS expiry update failed: {exc}") from exc
 
