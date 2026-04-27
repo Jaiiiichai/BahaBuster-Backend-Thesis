@@ -13,15 +13,30 @@ from ..schemas import (
     AlertResponse,
     AutoAlertGenerateResponse,
 )
-from ..supabase_client import (
-    fetch_alerts_by_barangay,
-    fetch_flood_reports_by_barangay,
-    fetch_push_tokens_by_barangay,
-    insert_alert,
-    update_alert_acknowledged,
-)
 
+from fastapi import status
 router = APIRouter(tags=["alerts"])
+
+@router.delete("/alerts/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_alert(alert_id: int, request: Request):
+    """Delete an alert by its ID."""
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    endpoint = f"{supabase_client.url}/rest/v1/alerts"
+    params = {"id": f"eq.{alert_id}"}
+    try:
+        response = supabase_client.session.delete(endpoint, params=params)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Supabase alert delete failed: {exc}") from exc
+
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Alert not found.")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase alert delete failed with HTTP {response.status_code}: {response.text}")
+    # No content returned on success
+    return
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts"
