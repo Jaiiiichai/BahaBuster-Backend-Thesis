@@ -14,6 +14,14 @@ from ..schemas import (
     AutoAlertGenerateResponse,
 )
 
+
+from ..supabase_client import (
+    insert_alert,
+    fetch_push_tokens_by_barangay,
+    fetch_flood_reports_by_barangay,
+    fetch_alerts_by_barangay,
+    update_alert_acknowledged,
+)
 from fastapi import status
 router = APIRouter(tags=["alerts"])
 

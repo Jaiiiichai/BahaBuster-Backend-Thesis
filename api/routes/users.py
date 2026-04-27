@@ -5,11 +5,17 @@ from fastapi import status
 from pydantic import BaseModel
 import bcrypt
 
+
 from ..schemas import (
     UserCreateRequest,
     UserPushTokenUpsertRequest,
     UserPushTokenUpsertResponse,
     UserResponse,
+)
+from ..supabase_client import (
+    fetch_users,
+    insert_user,
+    upsert_user_push_token,
 )
 
 router = APIRouter(tags=["users"])
