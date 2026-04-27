@@ -1,3 +1,47 @@
+from pydantic import BaseModel
+import bcrypt
+
+# Schema for partial user update
+class UserUpdateRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    password: str | None = None
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, payload: UserUpdateRequest, request: Request):
+    """Update user details (name, email, password). Only provided fields are updated."""
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    update_data = {}
+    if payload.name is not None:
+        update_data["name"] = payload.name
+    if payload.email is not None:
+        update_data["email"] = payload.email
+    if payload.password is not None:
+        update_data["password_hash"] = bcrypt.hashpw(payload.password.encode(), bcrypt.gensalt()).decode()
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields provided for update.")
+
+    endpoint = f"{supabase_client.url}/rest/v1/users"
+    params = {"user_id": f"eq.{user_id}"}
+    headers = {"Prefer": "return=representation"}
+    try:
+        response = supabase_client.session.patch(endpoint, params=params, json=update_data, headers=headers)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Supabase user update failed: {exc}") from exc
+
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase user update failed with HTTP {response.status_code}: {response.text}")
+
+    payload = response.json()
+    if not isinstance(payload, list) or not payload:
+        raise HTTPException(status_code=404, detail="User not found after update.")
+    return payload[0]
 """User-related endpoints backed by Supabase."""
 from fastapi import APIRouter, HTTPException, Request
 
@@ -9,7 +53,30 @@ from ..schemas import (
     UserPushTokenUpsertResponse,
     UserResponse,
 )
-from ..supabase_client import fetch_users, insert_user, upsert_user_push_token
+
+from fastapi import status
+router = APIRouter(tags=["users"])
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, request: Request):
+    """Delete a user by their user_id."""
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if supabase_client is None:
+        raise HTTPException(status_code=503, detail="Supabase is not configured.")
+
+    endpoint = f"{supabase_client.url}/rest/v1/users"
+    params = {"user_id": f"eq.{user_id}"}
+    try:
+        response = supabase_client.session.delete(endpoint, params=params)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Supabase user delete failed: {exc}") from exc
+
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase user delete failed with HTTP {response.status_code}: {response.text}")
+    # No content returned on success
+    return
 
 router = APIRouter(tags=["users"])
 
