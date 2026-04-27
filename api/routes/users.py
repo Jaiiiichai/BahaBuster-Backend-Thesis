@@ -27,6 +27,8 @@ class UserUpdateRequest(BaseModel):
     password: str | None = None
 
 
+
+
 @router.patch("/users/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, payload: UserUpdateRequest, request: Request):
     """Update user details (name, email, password). Only provided fields are updated."""
@@ -82,8 +84,6 @@ def delete_user(user_id: int, request: Request):
         raise HTTPException(status_code=502, detail=f"Supabase user delete failed with HTTP {response.status_code}: {response.text}")
     # No content returned on success
     return
-
-router = APIRouter(tags=["users"])
 
 
 @router.get("/users", response_model=list[UserResponse])
