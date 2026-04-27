@@ -1,5 +1,18 @@
+
+"""User-related endpoints backed by Supabase."""
+from fastapi import APIRouter, HTTPException, Request
+from fastapi import status
 from pydantic import BaseModel
 import bcrypt
+
+from ..schemas import (
+    UserCreateRequest,
+    UserPushTokenUpsertRequest,
+    UserPushTokenUpsertResponse,
+    UserResponse,
+)
+
+router = APIRouter(tags=["users"])
 
 # Schema for partial user update
 class UserUpdateRequest(BaseModel):
@@ -42,20 +55,6 @@ def update_user(user_id: int, payload: UserUpdateRequest, request: Request):
     if not isinstance(payload, list) or not payload:
         raise HTTPException(status_code=404, detail="User not found after update.")
     return payload[0]
-"""User-related endpoints backed by Supabase."""
-from fastapi import APIRouter, HTTPException, Request
-
-import bcrypt
-
-from ..schemas import (
-    UserCreateRequest,
-    UserPushTokenUpsertRequest,
-    UserPushTokenUpsertResponse,
-    UserResponse,
-)
-
-from fastapi import status
-router = APIRouter(tags=["users"])
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, request: Request):
